@@ -1,4 +1,9 @@
-# This module is aimed at performing Canny Edge Detection Analysis on a movie file
+# This module is aimed at performing Canny Edge Detection Analysis on a movie file to Yield Compliance
+# Metrics for the compliance_gui.py code
+
+# Created by Benjamin Randoing June-August 2022
+
+### Import Libraries Implemented in Code
 import numpy as np
 from matplotlib import pyplot as plt
 import cv2 as cv
@@ -16,42 +21,123 @@ def find_ind(data_list, value):
     index = diff_list.index(min_diff)
     return index, data_list[index]
 
+def trim_pressure(pressure_data, time_data, video_start, video_length, fps_vid, fps_p=100):
+    start_indx = 0
+    start_time = datetime.strptime(time_data[0], '%m/%d/%Y %H:%M:%S.%f')
+    diff = abs(start_time - video_start)
+    for i in range(len(time_data)):
+        formatted_times = datetime.strptime(time_data[i], '%m/%d/%Y %H:%M:%S.%f')
+        local_diff = abs(formatted_times - video_start)
+        if local_diff < diff:
+            diff = local_diff
+            start_indx = i
+
+    # start_indx = round(start_indx/fps_p*fps_vid)
+    pressure_data_trim = pressure_data[start_indx:start_indx+int(video_length/fps_vid*fps_p)]
+    time_data_trim = time_data[start_indx:start_indx + int(video_length/fps_vid*fps_p)]
+    return pressure_data_trim, time_data_trim
+
+def get_mean_compliance(frame_low, frame_high, p_low, p_high, edges):
+    left_edges_low = []
+    right_edges_low = []
+    for row in edges[frame_low]:
+        try:
+            left_edges_low.append(np.nonzero(row)[0][0])
+            right_edges_low.append(np.nonzero(row)[0][-1])
+        except IndexError:
+            left_edges_low.append(np.mean(left_edges_low))
+            right_edges_low.append(np.mean(left_edges_low))
+    left_edges_high = []
+    right_edges_high = []
+    for row in edges[frame_high]:
+        try:
+            left_edges_high.append(np.nonzero(row)[0][0])
+            right_edges_high.append(np.nonzero(row)[0][-1])
+        except IndexError:
+            left_edges_high.append(np.mean(left_edges_high))
+            right_edges_high.append(np.mean(right_edges_high))
+
+        pixel_diameters_low = []
+        pixel_diameters_high = []
+        compliances = []
+
+    low_med_diameter = np.median(right_edges_low) - np.median(left_edges_low)
+    high_med_diameter = np.median(right_edges_high) - np.median(left_edges_high)
+
+    for i in range(len(left_edges_low)):
+        pixel_diameters_low.append(right_edges_low[i] - left_edges_low[i])
+        pixel_diameters_high.append(right_edges_high[i] - left_edges_high[i])
+
+        comp = (((pixel_diameters_high[i]/2) - (pixel_diameters_low[i]/2)) / pixel_diameters_low[i]/2) / ((p_high - p_low) * 51.7149) * 10000
+        comp_v2 = (((high_med_diameter/2) - (low_med_diameter/2)) / low_med_diameter/2) / ((p_high - p_low) * 51.7149) * 10000
+        compliances.append(comp)
+
+    std_comp = np.std(compliances)
+    mean_comp = np.mean(compliances)
+
+    fixed_compliances = []
+    for comp in compliances:
+        if comp > mean_comp+std_comp or comp < mean_comp-std_comp:
+            continue
+        elif comp == None:
+            continue
+        fixed_compliances.append(comp)
+
+    y_vals = list(range(1088))
+    mean_compliance = np.median(fixed_compliances)
+
+    plt.figure()
+    plt.plot(fixed_compliances)
+    plt.axhline(y=mean_compliance)
+    plt.show()
+
+    plt.figure(2)
+    plt.subplot(1,2,1)
+    plt.imshow(edges[frame_low], cmap = 'gray')
+    plt.plot(left_edges_low, y_vals, color='r', linestyle='-')
+    plt.plot(right_edges_low, y_vals, color='r', linestyle='-')
+
+    plt.subplot(1,2,2)
+    plt.imshow(edges[frame_high], cmap = 'gray')
+    plt.plot(left_edges_high, y_vals, color='r', linestyle='-')
+    plt.plot(right_edges_high, y_vals, color='r', linestyle='-')
+    plt.show()
+
+    return mean_compliance
+
+
 def convert_pressure(value):
     return value / 51.7149 # from mmHg to psi
 
 def can_main_window(vid_filename, csv_filename, lowP, highP):
-    ### Move to Directory with Pressure and Image Data Inside
-    # os.chdir("S:/Data/NPD - New Product Development/Compliance Lighting/Lt154 compliance/Lt154-1/Cycle 11")
-    # os.chdir("C:/Users/brandoing/Documents/Canny-Edge-Detection/Lighting_Adjust")
 
+    plt.close("all")
     ### Read in Image Data and get File Start Time
-    # vid_filename = 'Basler acA2000-165um (22709932)_20220621_140058344.avi'
     start_date = vid_filename.split('_')[-2]
     start_time = vid_filename.split('_')[-1].split('.')[0]
     start = start_date+start_time
-    # print(start_time)
-    creation_time = datetime.strptime(start, '%Y%m%d%H%M%S%f')
-    # c_time = os.path.getmtime(filename)
-    # # convert creation timestamp into DateTime object
-    # creation_time = datetime.fromtimestamp(c_time)
-    # print('Created on:', creation_time)
-    # vid_start_time = creation_time - timedelta(seconds=8.01)
-    # # print(vid_start_time)
+    creation_time_raw = datetime.strptime(start, '%Y%m%d%H%M%S%f')
     video = cv.VideoCapture(vid_filename)
 
     ### Read in Pressure Data
-    # pData = pd.read_csv("Lt154 1 cycle 11 21JUN2022.csv", skiprows=2, skipfooter=3)
     pData = pd.read_csv(csv_filename, skiprows=2, skipfooter=3)
-    pData = pData[['Date Time', 'Ch2 (psi)', 'Ch3 (psi)']]
+    pData = pData[['Date Time', 'Ch4 (psi)', 'Ch3 (psi)']]
     # print(pData.head())
 
-    pArrayF = pData["Ch3 (psi)"].to_numpy()
-    pArrayB = pData["Ch2 (psi)"].to_numpy()
-    times = pData["Date Time"].to_numpy()
-    # print(times[0])
+    pArrayF_raw = pData["Ch3 (psi)"].to_numpy()
+    pArrayB_raw = pData["Ch4 (psi)"].to_numpy()
+    times_raw = pData["Date Time"].to_numpy()
+
+    threshold = abs(pArrayF_raw[0])*1.5
+    creation_ind, creation_p = find_ind(pArrayF_raw, threshold)
+    creation_time_bare = times_raw[creation_ind]
+    creation_time = datetime.strptime(creation_time_bare, '%m/%d/%Y %H:%M:%S.%f')
+
+    fps_vid = video.get(cv.CAP_PROP_FPS)
+    frames = (video.get(cv.CAP_PROP_FRAME_COUNT)-1)
+    pArrayF, times = trim_pressure(pArrayF_raw, times_raw, creation_time, frames, fps_vid)
 
     ## Find Exact Pressure and Indexes for 50 - 90 mmHg
-
     ind50, p50 = find_ind(pArrayF, convert_pressure((50)))
     time50 = times[ind50]
     date_time50 = datetime.strptime(time50, '%m/%d/%Y %H:%M:%S.%f')
@@ -65,10 +151,9 @@ def can_main_window(vid_filename, csv_filename, lowP, highP):
     dt90 = abs(date_time90 - creation_time)
 
     ## Find Exact Pressure and Indexes for 80 - 120 mmHg
-
     ind80, p80 = find_ind(pArrayF, convert_pressure((80)))
     time80 = times[ind80]
-    date_time80 = datetime.strptime(time50, '%m/%d/%Y %H:%M:%S.%f')
+    date_time80 = datetime.strptime(time80, '%m/%d/%Y %H:%M:%S.%f')
 
     ind120, p120 = find_ind(pArrayF, convert_pressure((120)))
     time120 = times[ind120]
@@ -79,7 +164,6 @@ def can_main_window(vid_filename, csv_filename, lowP, highP):
     dt120 = abs(date_time120 - creation_time)
 
     ## Find Exact Pressure and Indexes for 110 - 150 mmHg
-
     ind110, p110 = find_ind(pArrayF, convert_pressure((110)))
     time110 = times[ind110]
     date_time110 = datetime.strptime(time110, '%m/%d/%Y %H:%M:%S.%f')
@@ -93,7 +177,6 @@ def can_main_window(vid_filename, csv_filename, lowP, highP):
     dt150 = abs(date_time150 - creation_time)
 
     ## Find Exact Pressure and Indexes for Low -High mmHg
-
     indLow, pLow = find_ind(pArrayF, convert_pressure((lowP)))
     timeLow = times[indLow]
     date_timeLow = datetime.strptime(timeLow, '%m/%d/%Y %H:%M:%S.%f')
@@ -108,7 +191,7 @@ def can_main_window(vid_filename, csv_filename, lowP, highP):
 
 
     ## Find the Start and End Frames in the Video
-    fps = 100  # Hz
+    fps = fps_vid  # Hz
     frame50 = round(dt50.total_seconds() * fps)
     frame90 = round(dt90.total_seconds() * fps)
 
@@ -125,7 +208,7 @@ def can_main_window(vid_filename, csv_filename, lowP, highP):
     max_p = np.max(pArrayF)
     max_index = np.where(pArrayF == max_p)[0][0]
     max_time = times[max_index]
-    print(max_time)
+    # print(max_time)
     max_date_time = datetime.strptime(max_time, '%m/%d/%Y %H:%M:%S.%f')
 
 
@@ -134,7 +217,7 @@ def can_main_window(vid_filename, csv_filename, lowP, highP):
     min_index = np.where(first_deriv != 0)[0][0]
     min_p = pArrayF[min_index]
     min_time = times[min_index]
-    print(min_time)
+    # print(min_time)
     min_date_time = datetime.strptime(min_time, '%m/%d/%Y %H:%M:%S.%f')
 
     ## Find Time Difference between Min and Max Pressures
@@ -147,167 +230,67 @@ def can_main_window(vid_filename, csv_filename, lowP, highP):
     dt_min = abs(min_date_time - creation_time)
     dt_max = abs(max_date_time - creation_time)
 
-    print(dt_min)
-    print(dt_max)
+    # print(dt_min)
+    # print(dt_max)
 
     ## Find the Start and End Frames in the Video
-    fps = 100  # Hz
+    fps = fps_vid  # Hz
     frame_start = round(dt_min.total_seconds()*fps)
     frame_end = round(dt_max.total_seconds()*fps)
-    print(frame_start)
-    print(frame_end)
-
-    ## Prepare Changing Diameter
-    diameter_v_time = []
-
+    # print(frame_start)
+    # print(frame_end)
 
 
     ## Find HAV Pixel Diameter
+    frame = 0
+    all_frames = []
+    all_edges = []
 
-
-    frame = 1
     while(video.isOpened()):
-
         success, image = video.read()
-        edges = cv.Canny(image, 30, 40)
-
-
-        if success:
-
-            left_edges = []
-            right_edges = []
-            count = 0
-            for row in edges:
-                left_edges.append(np.nonzero(row)[0][0])
-                right_edges.append(np.nonzero(row)[0][-1])
-                # for pixel in row:
-                #     if pixel != 0:
-                #         left_edges.append(list(row).index(pixel))
-                #         break
-
-                # list(row).reverse()
-                # for pixel in row:
-                #     if pixel != 0:
-                #         indx = list(row).index(pixel)
-                #         right_edges.append((len(row)-indx-1))
-                #         break
-
-            left_edge = np.mean(left_edges)
-            right_edge = np.mean(right_edges)
-            diff = np.array(right_edges)-np.array(left_edges)
-            pixel_diameter = right_edge-left_edge
-            diameter_v_time.append(pixel_diameter)
-            print(pixel_diameter)
-            frame +=1
-        else:
+        if not success:
             break
-        # if cv.waitKey(1) & 0xFF == ord('q'):
-        #     break
+        edges = cv.Canny(image, 30, 50)
+        all_frames.append(image)
+        all_edges.append(edges)
+        frame += 1
+        print(frame)
+
     video.release()
     cv.destroyAllWindows()
 
-    ### Find pixel_diameters at Frames of Interest
-
-    start_diameter = diameter_v_time[frame_start]
-    try:
-        end_diameter = diameter_v_time[frame_end]
-    except IndexError:
-        end_diameter = diameter_v_time[-1]
-
-    ### Find pixel_diameters at Frames 50/90 80/120 110/150
-
-    diameter50 = diameter_v_time[frame50]
-    diameter90 = diameter_v_time[frame90]
-
-    diameter80 = diameter_v_time[frame80]
-    diameter120 = diameter_v_time[frame120]
-
-    diameter110 = diameter_v_time[frame110]
-    diameter150 = diameter_v_time[frame150]
-
-    diameterLow = diameter_v_time[frameLow]
-    diameterHigh = diameter_v_time[frameHigh]
-
-    ### Calculate Compliance Min/Max
-
-    vessel_thickness = 0
-    start_radius = start_diameter/2 - vessel_thickness
-    end_radius = end_diameter/2 - vessel_thickness
-    compliance = ((end_radius - start_radius)/start_radius) / (dP*51.7149) * 10000
-    print(compliance)
-
-    ### Calculate Compliance Low/High GUI Entry
-
-    vessel_thickness = 0
-    start_radius = diameterLow / 2 - vessel_thickness
-    end_radius = diameterHigh / 2 - vessel_thickness
-    complianceLH = ((end_radius - start_radius) / start_radius) / ((pHigh - pLow) * 51.7149) * 10000
-    print(complianceLH)
-
-    ### Calculate Compliance 50/90
-
-    vessel_thickness = 0
-    start_radius = diameter50 / 2 - vessel_thickness
-    end_radius = diameter90 / 2 - vessel_thickness
-    compliance5090 = ((end_radius - start_radius) / start_radius) / ((p90-p50) * 51.7149) * 10000
-    print(compliance5090)
-
-    ### Calculate Compliance 80/120
-
-    vessel_thickness = 0
-    start_radius = diameter80 / 2 - vessel_thickness
-    end_radius = diameter120 / 2 - vessel_thickness
-    compliance80120 = ((end_radius - start_radius) / start_radius) / ((p120 - p80) * 51.7149) * 10000
-    print(compliance80120)
-    # return compliance80120
-
-    ### Calculate Compliance 110/150
-
-    vessel_thickness = 0
-    start_radius = diameter110 / 2 - vessel_thickness
-    end_radius = diameter150 / 2 - vessel_thickness
-    compliance110150 = ((end_radius - start_radius) / start_radius) / ((p150 - p110) * 51.7149) * 10000
-    print(compliance110150)
-    return compliance5090, compliance80120, compliance110150, complianceLH
-
-
-    ########################## Plotting ########################################
-
-    ### Plots the Numerical Edge Indexes Left and Right
-    # plt.figure()
-    # plt.plot(left_edges)
-    # plt.plot(right_edges)
-    # plt.plot(diff)
-    # plt.legend(["left", "right", "diff"])
-    # plt.show()
-
-    ### Plots the Pixel Diameter over Time
-    # plt.figure()
-    # plt.plot(diameter_v_time)
-    # plt.savefig("HAV_diameter_LT154_1_Cycle11_Updated.jpg")
-    # plt.show()
-
-    ### Plots the images
-    # plt.figure(1, figsize = [12,8])
-    # plt.subplot(1,2,1)
-    # plt.imshow(image)
-    # # plt.title("Ring_Centered_7_4")
-
-    # plt.subplot(1,2,2)
-    # plt.imshow(edges+50, cmap = "gray")
-    # # plt.title("Ring_Centered_7_4_Edges")
-    # # plt.savefig("Ring_Centered_7_4_Data.jpg")
-    # plt.show()
+    outputs = []
+    outputs.append(get_mean_compliance(frameLow, frameHigh, pLow, pHigh, all_edges))
+    outputs.append(get_mean_compliance(frame50, frame90, p50, p90, all_edges))
+    outputs.append(get_mean_compliance(frame80, frame120, p80, p120, all_edges))
+    outputs.append(get_mean_compliance(frame110, frame150, p110, p150, all_edges))
 
 
     ###################################### Exporting ##################################
 
     ### Save Data to CSV File
 
+    date_time_now = datetime.now()
+    string_out_time = date_time_now.strftime('%d%b%Y_%H%M%S')
+
+
+    df1 = pd.DataFrame({'TimeStamp': times,
+                        'Pressure (psi)': pArrayF,
+                        'Compliance 50/90': outputs[1],
+                        'Compliance 80/120': outputs[2],
+                        'Compliance 110/150': outputs[3]})
+
+    df1.to_csv('Data_Output_'+string_out_time+'.csv', index=False)
+
+    print(outputs)
+    return outputs
+
+
+
 if __name__ == '__main__':
-    os.chdir("S:/Data/NPD - New Product Development/Compliance Lighting/Lt154 compliance/Lt154-2/Cycle 11")
-    video_file = 'Basler acA2000-165um (22709932)_20220621_142115740.avi'
-    pressure_file = "Lt154-2 cycle 11 21JUN2022.csv"
+    os.chdir("D:/Compliance Testing/J2DW_C1D1V6/Proximal/cycle 1")
+    video_file = 'Basler acA2000-165um (22709932)_20220719_145846020.avi'
+    pressure_file = "J2DW C1D1V6 cycle 1 19JULY2022.csv"
     compliance = can_main_window(video_file, pressure_file, 50, 90)
 
 

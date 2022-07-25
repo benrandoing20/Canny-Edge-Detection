@@ -22,14 +22,19 @@ def gui_main_window():
             return
 
     def run_cmd():
-        low_entryP = int(id_entry.get())
-        high_entryP = int(id_entry2.get())
+        try:
+            low_entryP = int(id_entry.get())
+            high_entryP = int(id_entry2.get())
+        except ValueError:
+            low_entryP=50
+            high_entryP=90
 
-        compliance5090, compliance80120, compliance110150, complianceLH = can_main_window(video_filename, pressure_filename, low_entryP, high_entryP)
-        comp_label5090.configure(text=str(compliance5090))
-        comp_label80120.configure(text=str(compliance80120))
-        comp_label110150.configure(text=str(compliance110150))
-        comp_labelLH.configure(text=str(complianceLH))
+        outputs = can_main_window(video_filename, pressure_filename, low_entryP, high_entryP)
+
+        comp_labelLH.configure(text=str(outputs[0]))
+        comp_label5090.configure(text=str(outputs[1]))
+        comp_label80120.configure(text=str(outputs[2]))
+        comp_label110150.configure(text=str(outputs[3]))
 
 
     ## Create root/base window
@@ -66,22 +71,22 @@ def gui_main_window():
 
 
     ## Compliance 50/90 Label
-    ttk.Label(root, text="Compliance 50-90 mmHg:").grid(column=2, row=7,sticky=tk.W)
+    ttk.Label(root, text="Compliance Whole Vessel 50-90 mmHg:").grid(column=2, row=7,sticky=tk.W)
     comp_label5090 = ttk.Label(root, text="No Analysis Run")
     comp_label5090.grid(column=3, row=7, sticky=tk.W)
 
     ## Compliance 80/120 Label
-    ttk.Label(root, text="Compliance 80-120 mmHg:").grid(column=2, row=8, sticky=tk.W)
+    ttk.Label(root, text="Compliance Whole Vessel 80-120 mmHg:").grid(column=2, row=8, sticky=tk.W)
     comp_label80120 = ttk.Label(root, text="No Analysis Run")
     comp_label80120.grid(column=3, row=8, sticky=tk.W)
 
     ## Compliance 110/150 Label
-    ttk.Label(root, text="Compliance 110-150 mmHg:").grid(column=2, row=9, sticky=tk.W)
+    ttk.Label(root, text="Compliance Whole Vessel 110-150 mmHg:").grid(column=2, row=9, sticky=tk.W)
     comp_label110150 = ttk.Label(root, text="No Analysis Run")
     comp_label110150.grid(column=3, row=9, sticky=tk.W)
 
     ## Compliance Low/High Label
-    ttk.Label(root, text="Compliance Low-High mmHg:").grid(column=2, row=10, sticky=tk.W)
+    ttk.Label(root, text="Compliance Whole Vessel Low-High mmHg:").grid(column=2, row=10, sticky=tk.W)
     comp_labelLH = ttk.Label(root, text="No Analysis Run")
     comp_labelLH.grid(column=3, row=10, sticky=tk.W)
 
