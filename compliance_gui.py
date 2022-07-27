@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import ttk
 from tkinter import filedialog
 from canny_edge import can_main_window
+import os
 
 def gui_main_window():
 
@@ -13,10 +14,13 @@ def gui_main_window():
         pres_label.configure(text = str(pressure_filename))
         if pressure_filename == "":
             return
-
+    filepath = ""
     def vid_cmd():
         nonlocal video_filename
+        nonlocal filepath
         video_filename = filedialog.askopenfilename()
+        filepath = os.path.dirname(os.path.abspath(video_filename))
+        print(filepath)
         vid_label.configure(text = str(video_filename))
         if video_filename == "":
             return
@@ -29,7 +33,7 @@ def gui_main_window():
             low_entryP=50
             high_entryP=90
 
-        outputs = can_main_window(video_filename, pressure_filename, low_entryP, high_entryP)
+        outputs = can_main_window(video_filename, pressure_filename, low_entryP, high_entryP, filepath)
 
         comp_labelLH.configure(text=str(outputs[0]))
         comp_label5090.configure(text=str(outputs[1]))

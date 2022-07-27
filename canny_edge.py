@@ -109,14 +109,14 @@ def get_mean_compliance(frame_low, frame_high, p_low, p_high, edges):
 def convert_pressure(value):
     return value / 51.7149 # from mmHg to psi
 
-def can_main_window(vid_filename, csv_filename, lowP, highP):
+def can_main_window(vid_filename, csv_filename, lowP, highP, filepath):
 
     plt.close("all")
     ### Read in Image Data and get File Start Time
     start_date = vid_filename.split('_')[-2]
     start_time = vid_filename.split('_')[-1].split('.')[0]
     start = start_date+start_time
-    creation_time_raw = datetime.strptime(start, '%Y%m%d%H%M%S%f')
+    creation_time = datetime.strptime(start, '%Y%m%d%H%M%S%f')
     video = cv.VideoCapture(vid_filename)
 
     ### Read in Pressure Data
@@ -128,10 +128,10 @@ def can_main_window(vid_filename, csv_filename, lowP, highP):
     pArrayB_raw = pData["Ch4 (psi)"].to_numpy()
     times_raw = pData["Date Time"].to_numpy()
 
-    threshold = abs(pArrayF_raw[0])*1.5
-    creation_ind, creation_p = find_ind(pArrayF_raw, threshold)
-    creation_time_bare = times_raw[creation_ind]
-    creation_time = datetime.strptime(creation_time_bare, '%m/%d/%Y %H:%M:%S.%f')
+    # threshold = abs(pArrayF_raw[0])*1.5
+    # creation_ind, creation_p = find_ind(pArrayF_raw, threshold)
+    # creation_time_bare = times_raw[creation_ind]
+    # creation_time = datetime.strptime(creation_time_bare, '%m/%d/%Y %H:%M:%S.%f')
 
     fps_vid = video.get(cv.CAP_PROP_FPS)
     frames = (video.get(cv.CAP_PROP_FRAME_COUNT)-1)
@@ -250,7 +250,7 @@ def can_main_window(vid_filename, csv_filename, lowP, highP):
         success, image = video.read()
         if not success:
             break
-        edges = cv.Canny(image, 30, 50)
+        edges = cv.Canny(image, 30,40)
         all_frames.append(image)
         all_edges.append(edges)
         frame += 1
@@ -280,9 +280,9 @@ def can_main_window(vid_filename, csv_filename, lowP, highP):
                         'Compliance 80/120': outputs[2],
                         'Compliance 110/150': outputs[3]})
 
+    os.chdir(filepath)
     df1.to_csv('Data_Output_'+string_out_time+'.csv', index=False)
 
-    print(outputs)
     return outputs
 
 
