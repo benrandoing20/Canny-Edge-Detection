@@ -12,34 +12,37 @@ import pandas as pd
 from datetime import datetime, timedelta
 
 
+### This function takes a pressure input to find the index, timestamp of occurrence to identiy the video frame at the same time
 def find_ind(data_list, value):
-    data_list = list(data_list)
+    data_list = list(data_list) # List of Pressure Values
     diff_list = []
     for i in data_list:
-        diff_list.append(abs(i-value))
+        diff_list.append(abs(i-value)) # Use Minimum difference between pressures and input value to find index
     min_diff = min(diff_list)
     index = diff_list.index(min_diff)
     return index, data_list[index]
 
+### This function crops pressure data based on the video occurrence
 def trim_pressure(pressure_data, time_data, video_start, video_length, fps_vid, fps_p=100):
     start_indx = 0
     start_time = datetime.strptime(time_data[0], '%m/%d/%Y %H:%M:%S.%f')
     diff = abs(start_time - video_start)
-    for i in range(len(time_data)):
+    for i in range(len(time_data)): # Investigates pressure timestamps with dT to start of video to find when to start pressure data
         formatted_times = datetime.strptime(time_data[i], '%m/%d/%Y %H:%M:%S.%f')
         local_diff = abs(formatted_times - video_start)
         if local_diff < diff:
             diff = local_diff
             start_indx = i
 
-    # start_indx = round(start_indx/fps_p*fps_vid)
     pressure_data_trim = pressure_data[start_indx:start_indx+int(video_length/fps_vid*fps_p)]
     time_data_trim = time_data[start_indx:start_indx + int(video_length/fps_vid*fps_p)]
     return pressure_data_trim, time_data_trim
 
+### This is the core function that finds compliance values provided frames, pressures, and an array of Canny Filtered Images
 def get_mean_compliance(frame_low, frame_high, p_low, p_high, edges):
     left_edges_low = []
     right_edges_low = []
+    # The first two loops find the edges for the frames corresponding to low and high pressures
     for row in edges[frame_low]:
         try:
             left_edges_low.append(np.nonzero(row)[0][0])
@@ -57,6 +60,7 @@ def get_mean_compliance(frame_low, frame_high, p_low, p_high, edges):
             left_edges_high.append(np.mean(left_edges_high))
             right_edges_high.append(np.mean(right_edges_high))
 
+
         pixel_diameters_low = []
         pixel_diameters_high = []
         compliances = []
@@ -64,6 +68,7 @@ def get_mean_compliance(frame_low, frame_high, p_low, p_high, edges):
     low_med_diameter = np.median(right_edges_low) - np.median(left_edges_low)
     high_med_diameter = np.median(right_edges_high) - np.median(left_edges_high)
 
+    # The following loop finds the pixel diameter of each frame and the calculates compliance
     for i in range(len(left_edges_low)):
         pixel_diameters_low.append(right_edges_low[i] - left_edges_low[i])
         pixel_diameters_high.append(right_edges_high[i] - left_edges_high[i])
@@ -84,8 +89,11 @@ def get_mean_compliance(frame_low, frame_high, p_low, p_high, edges):
         fixed_compliances.append(comp)
 
     y_vals = list(range(1088))
+    # The mean value of compliance is found using the median to avoid influence from significant outliers
     mean_compliance = np.median(fixed_compliances)
 
+    # The following plots are the median line through all calculated compliances and the visualization of the edges used to
+    # debug the canny Edge Detection Threshold Values
     plt.figure()
     plt.plot(fixed_compliances)
     plt.axhline(y=mean_compliance)
@@ -105,18 +113,18 @@ def get_mean_compliance(frame_low, frame_high, p_low, p_high, edges):
 
     return mean_compliance
 
-
+# This function converts pressure from mmHg to psi
 def convert_pressure(value):
     return value / 51.7149 # from mmHg to psi
 
-def can_main_window(vid_filename, csv_filename, lowP, highP):
+# This is the main function called by the gui
+def can_main_window(vid_filename, csv_filename, lowP, highP, filepath):
 
-    plt.close("all")
     ### Read in Image Data and get File Start Time
     start_date = vid_filename.split('_')[-2]
     start_time = vid_filename.split('_')[-1].split('.')[0]
     start = start_date+start_time
-    creation_time_raw = datetime.strptime(start, '%Y%m%d%H%M%S%f')
+    creation_time = datetime.strptime(start, '%Y%m%d%H%M%S%f')
     video = cv.VideoCapture(vid_filename)
 
     ### Read in Pressure Data
@@ -128,10 +136,11 @@ def can_main_window(vid_filename, csv_filename, lowP, highP):
     pArrayB_raw = pData["Ch4 (psi)"].to_numpy()
     times_raw = pData["Date Time"].to_numpy()
 
-    threshold = abs(pArrayF_raw[0])*1.5
-    creation_ind, creation_p = find_ind(pArrayF_raw, threshold)
-    creation_time_bare = times_raw[creation_ind]
-    creation_time = datetime.strptime(creation_time_bare, '%m/%d/%Y %H:%M:%S.%f')
+    ### ALternate Code to find Start Time if Video Timestamp is Corrupted
+    # threshold = abs(pArrayF_raw[0])*1.5
+    # creation_ind, creation_p = find_ind(pArrayF_raw, threshold)
+    # creation_time_bare = times_raw[creation_ind]
+    # creation_time = datetime.strptime(creation_time_bare, '%m/%d/%Y %H:%M:%S.%f')
 
     fps_vid = video.get(cv.CAP_PROP_FPS)
     frames = (video.get(cv.CAP_PROP_FRAME_COUNT)-1)
@@ -246,11 +255,12 @@ def can_main_window(vid_filename, csv_filename, lowP, highP):
     all_frames = []
     all_edges = []
 
+    ### Loop Through ALl Frames to Obtain a list of Canny Edge Filtered Images
     while(video.isOpened()):
         success, image = video.read()
         if not success:
             break
-        edges = cv.Canny(image, 30, 50)
+        edges = cv.Canny(image, 30,40)
         all_frames.append(image)
         all_edges.append(edges)
         frame += 1
@@ -280,13 +290,14 @@ def can_main_window(vid_filename, csv_filename, lowP, highP):
                         'Compliance 80/120': outputs[2],
                         'Compliance 110/150': outputs[3]})
 
+    os.chdir(filepath)
     df1.to_csv('Data_Output_'+string_out_time+'.csv', index=False)
 
-    print(outputs)
     return outputs
 
 
 
+# This runs the code if the gui is not run. 
 if __name__ == '__main__':
     os.chdir("D:/Compliance Testing/J2DW_C1D1V6/Proximal/cycle 1")
     video_file = 'Basler acA2000-165um (22709932)_20220719_145846020.avi'

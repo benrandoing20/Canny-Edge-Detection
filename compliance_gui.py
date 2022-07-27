@@ -2,25 +2,35 @@ import tkinter as tk
 from tkinter import ttk
 from tkinter import filedialog
 from canny_edge import can_main_window
+import os
+
 
 def gui_main_window():
 
     pressure_filename = ""
     video_filename = ""
+
+    ### A function to allow user selection of a pressure data file
     def pressure_cmd():
         nonlocal pressure_filename
         pressure_filename = filedialog.askopenfilename()
         pres_label.configure(text = str(pressure_filename))
         if pressure_filename == "":
             return
+    filepath = ""
 
+    ### A function to allow user selection of a video file
     def vid_cmd():
         nonlocal video_filename
+        nonlocal filepath
         video_filename = filedialog.askopenfilename()
+        filepath = os.path.dirname(os.path.abspath(video_filename))
+        print(filepath)
         vid_label.configure(text = str(video_filename))
         if video_filename == "":
             return
 
+    ### The function that is called when the run button is pressed. It runs the canny_edge.py main window
     def run_cmd():
         try:
             low_entryP = int(id_entry.get())
@@ -29,7 +39,7 @@ def gui_main_window():
             low_entryP=50
             high_entryP=90
 
-        outputs = can_main_window(video_filename, pressure_filename, low_entryP, high_entryP)
+        outputs = can_main_window(video_filename, pressure_filename, low_entryP, high_entryP, filepath)
 
         comp_labelLH.configure(text=str(outputs[0]))
         comp_label5090.configure(text=str(outputs[1]))
@@ -41,8 +51,6 @@ def gui_main_window():
     root = tk.Tk()
     root.title("Compliance Analysis")
     root.geometry("1200x400")
-
-
 
     ## Buttons
     ttk.Button(root, text="Select Pressure Data", command=pressure_cmd).grid(column = 2, row = 2, sticky=tk.W)
