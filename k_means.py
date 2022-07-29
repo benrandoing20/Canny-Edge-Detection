@@ -33,21 +33,22 @@ proximal = formatted_data[0:15]
 distal = formatted_data_dist[0:15]
 data_local = np.vstack((proximal, distal))
 
-### Identify Number of Clusters to use via Inertia (Identified 4 Clusters)
+# ## Identify Number of Clusters to use via Inertia (Identified 4 Clusters)
 # num_clusters = list(range(1,9))
 # inertias = []
 #
 # for num in num_clusters:
-#     model = KMeans(n_clusters = 4)
+#     model = KMeans(n_clusters = num)
 #     model.fit(formatted_data)
 #     inertias.append(model.inertia_)
 #
 # plt.plot(num_clusters, inertias, '-o')
 # plt.xlabel('Number of Clusters (k)')
 # plt.ylabel('Inertia')
+# plt.savefig("Inertia for Age")
 # plt.show()
 
-
+#
 # ### Model 4 Clusters
 # model = KMeans(n_clusters = 4)
 # model.fit(formatted_data)
@@ -181,7 +182,7 @@ data_pcomp.columns = ['PC1', 'PC2']
 ### Model Clusters using new Principle Components
 
 ## 1. Create KMeans Model and save Predicted Labels and Cluster Center
-model_PCA = KMeans(n_clusters = 4)
+model_PCA = KMeans(n_clusters = 2)
 model_PCA.fit(data_pcomp_array)
 labels_PCA = model_PCA.predict(data_pcomp_array)
 centers_PCA = model_PCA.cluster_centers_

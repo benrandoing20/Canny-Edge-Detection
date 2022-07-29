@@ -124,7 +124,7 @@ def can_main_window(vid_filename, csv_filename, lowP, highP, filepath):
     start_date = vid_filename.split('_')[-2]
     start_time = vid_filename.split('_')[-1].split('.')[0]
     start = start_date+start_time
-    creation_time = datetime.strptime(start, '%Y%m%d%H%M%S%f')
+    # creation_time = datetime.strptime(start, '%Y%m%d%H%M%S%f')
     video = cv.VideoCapture(vid_filename)
 
     ### Read in Pressure Data
@@ -137,10 +137,10 @@ def can_main_window(vid_filename, csv_filename, lowP, highP, filepath):
     times_raw = pData["Date Time"].to_numpy()
 
     ### ALternate Code to find Start Time if Video Timestamp is Corrupted
-    # threshold = abs(pArrayF_raw[0])*1.5
-    # creation_ind, creation_p = find_ind(pArrayF_raw, threshold)
-    # creation_time_bare = times_raw[creation_ind]
-    # creation_time = datetime.strptime(creation_time_bare, '%m/%d/%Y %H:%M:%S.%f')
+    threshold = abs(pArrayF_raw[0])*1.5
+    creation_ind, creation_p = find_ind(pArrayF_raw, threshold)
+    creation_time_bare = times_raw[creation_ind]
+    creation_time = datetime.strptime(creation_time_bare, '%m/%d/%Y %H:%M:%S.%f')
 
     fps_vid = video.get(cv.CAP_PROP_FPS)
     frames = (video.get(cv.CAP_PROP_FRAME_COUNT)-1)
@@ -260,7 +260,8 @@ def can_main_window(vid_filename, csv_filename, lowP, highP, filepath):
         success, image = video.read()
         if not success:
             break
-        edges = cv.Canny(image, 30,40)
+        print(image[0])
+        edges = cv.Canny(image, 20,40)
         all_frames.append(image)
         all_edges.append(edges)
         frame += 1
@@ -299,10 +300,11 @@ def can_main_window(vid_filename, csv_filename, lowP, highP, filepath):
 
 # This runs the code if the gui is not run. 
 if __name__ == '__main__':
-    os.chdir("D:/Compliance Testing/J2DW_C1D1V6/Proximal/cycle 1")
-    video_file = 'Basler acA2000-165um (22709932)_20220719_145846020.avi'
-    pressure_file = "J2DW C1D1V6 cycle 1 19JULY2022.csv"
-    compliance = can_main_window(video_file, pressure_file, 50, 90)
+    os.chdir("C:/Users/brandoing/Desktop/Lt154-8/cycle 11")
+    video_file = 'Basler acA2000-165um (22709932)_20220711_130243837.avi'
+    pressure_file = "Lt154-8 cycle 11 11JULY2022.csv"
+    filepath = os.path.dirname(os.path.abspath(video_file))
+    compliance = can_main_window(video_file, pressure_file, 50, 90, filepath)
 
 
 

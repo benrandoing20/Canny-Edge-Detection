@@ -35,7 +35,10 @@ This code streamlines the analysis of video and pressure data to quantify vessel
 1. Ensure you are in the virtual environment and the correct folder in git bash. 
 2. Type `pip install pyinstaller`.
 3. Type `pyinstaller --onefile -w compliance_gui.py`
-
+   1. If a Modle not FOund error for pandas occurs, delete the dict folder and .spec file and rerun 
+   `pyinstaller --hidden-import=pandas._libs.tslibs.base --onefile -w compliance_gui.py`
+   2. If an error occurs with opencv, reduce the opencv Python version to 4.5.5.64
+      1. This can be done with typing `pip uninstall opencv-python`
 ## How to Run GUI (2 Options)
 1. If the GUI executable has been installed, navigate to the appropriate location of the compliance_gui executable and run the file.
 2. If the GUI executable has not been installed, open the compliance_gui.py file in pyCharm, Visual Studio Code, or another python IDE to run the file.
