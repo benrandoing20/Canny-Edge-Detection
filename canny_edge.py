@@ -77,25 +77,25 @@ def get_mean_compliance(frame_low, frame_high, p_low, p_high, edges):
         comp_v2 = (((high_med_diameter/2) - (low_med_diameter/2)) / low_med_diameter/2) / ((p_high - p_low) * 51.7149) * 10000
         compliances.append(comp)
 
-    std_comp = np.std(compliances)
-    mean_comp = np.mean(compliances)
-
-    fixed_compliances = []
-    for comp in compliances:
-        if comp > mean_comp+std_comp or comp < mean_comp-std_comp:
-            continue
-        elif comp == None:
-            continue
-        fixed_compliances.append(comp)
+    # std_comp = np.std(compliances)
+    # mean_comp = np.mean(compliances)
+    #
+    # fixed_compliances = []
+    # for comp in compliances:
+    #     if comp > mean_comp+std_comp or comp < mean_comp-std_comp:
+    #         continue
+    #     elif comp == None:
+    #         continue
+    #     fixed_compliances.append(comp)
 
     y_vals = list(range(1088))
     # The mean value of compliance is found using the median to avoid influence from significant outliers
-    mean_compliance = np.median(fixed_compliances)
+    mean_compliance = np.median(compliances)
 
     # The following plots are the median line through all calculated compliances and the visualization of the edges used to
     # debug the canny Edge Detection Threshold Values
     plt.figure()
-    plt.plot(fixed_compliances)
+    plt.plot(compliances)
     plt.axhline(y=mean_compliance)
     plt.show()
 
@@ -124,7 +124,7 @@ def can_main_window(vid_filename, csv_filename, lowP, highP, filepath):
     start_date = vid_filename.split('_')[-2]
     start_time = vid_filename.split('_')[-1].split('.')[0]
     start = start_date+start_time
-    # creation_time = datetime.strptime(start, '%Y%m%d%H%M%S%f')
+    creation_time = datetime.strptime(start, '%Y%m%d%H%M%S%f')
     video = cv.VideoCapture(vid_filename)
 
     ### Read in Pressure Data
@@ -136,11 +136,11 @@ def can_main_window(vid_filename, csv_filename, lowP, highP, filepath):
     pArrayB_raw = pData["Ch4 (psi)"].to_numpy()
     times_raw = pData["Date Time"].to_numpy()
 
-    ### ALternate Code to find Start Time if Video Timestamp is Corrupted
-    threshold = abs(pArrayF_raw[0])*1.5
-    creation_ind, creation_p = find_ind(pArrayF_raw, threshold)
-    creation_time_bare = times_raw[creation_ind]
-    creation_time = datetime.strptime(creation_time_bare, '%m/%d/%Y %H:%M:%S.%f')
+    ### Alternate Code to find Start Time if Video Timestamp is Corrupted
+    # threshold = abs(pArrayF_raw[0])*1.5
+    # creation_ind, creation_p = find_ind(pArrayF_raw, threshold)
+    # creation_time_bare = times_raw[creation_ind]
+    # creation_time = datetime.strptime(creation_time_bare, '%m/%d/%Y %H:%M:%S.%f')
 
     fps_vid = video.get(cv.CAP_PROP_FPS)
     frames = (video.get(cv.CAP_PROP_FRAME_COUNT)-1)
@@ -260,8 +260,18 @@ def can_main_window(vid_filename, csv_filename, lowP, highP, filepath):
         success, image = video.read()
         if not success:
             break
-        print(image[0])
-        edges = cv.Canny(image, 20,40)
+        #Auto Threshodling Option, If not desired, replace threshoding in Canny with numerical values
+        image_cols = list(image[0][:,2])
+        col_deriv = list(np.diff(image_cols))
+        col_fixed = []
+        i = 0
+        while i < len(col_deriv):
+            if col_deriv[i] > 100:
+                col_deriv.pop(i)
+                i -= 1
+            i += 1
+        max_val = max(col_deriv)
+        edges = cv.Canny(image, max_val, 3*max_val)
         all_frames.append(image)
         all_edges.append(edges)
         frame += 1
